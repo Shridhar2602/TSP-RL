@@ -6,7 +6,7 @@ from collections import deque
 import random
 import tensorflow as tf
 
-class DQNAgent():
+class DDQNAgent():
 	def __init__(self, n_states, n_actions, epsilon = 1.0, epsilon_min = 0.01, epsilon_decay = 0.5, gamma = 0.95, lr = 0.8, memory_size = 256, batch_size=64):
 		self.n_states = n_states
 		self.n_actions = n_actions
@@ -19,7 +19,8 @@ class DQNAgent():
 		self.batch_size = batch_size
 		np.random.seed(0)
 		random.seed(0)
-		self.model = self.create_model(self.n_states, self.n_actions);
+		self.modelA = self.create_model(self.n_states, self.n_actions);
+		self.modelB = self.create_model(self.n_states, self.n_actions);
 	
 		self.replay_memory = deque(maxlen=self.memory_size)
 
@@ -34,14 +35,17 @@ class DQNAgent():
 	
 	def oneHot(self, state):
 		return tf.expand_dims(tf.one_hot(state, self.n_states), axis=0)
-
+	
 	def epsilon_greedy(self, state, visited_states):
 
 		state = self.oneHot(state)
-		# state = state.reshape(1, -1)
-		q = self.model.predict(state, verbose=0)
+		qA = self.modelA.predict(state, verbose=0)
+		qB = self.modelB.predict(state, verbose=0)
 
-		q = np.squeeze(q)
+		qA = np.squeeze(qA)
+		qB = np.squeeze(qB)
+
+		q = (qA + qB) / 2
 
 		q[visited_states] = -np.inf
 
@@ -59,17 +63,17 @@ class DQNAgent():
 
 		return action
 
-	# def greedy(self, state, visited_states):
+	def greedy(self, state, visited_states):
 
-	# 	state = self.oneHot(state)
-	# 	q = self.model.predict(state, verbose=0)
+		state = self.oneHot(state)
+		q = self.model.predict(state, verbose=0)
 
-	# 	q[visited_states] = -np.inf
+		q[visited_states] = -np.inf
 
-	# 	if(len(visited_states) == self.n_states):
-	# 		return visited_states[0]
-	# 	else:
-	# 		return np.argmax(q)
+		if(len(visited_states) == self.n_states):
+			return visited_states[0]
+		else:
+			return np.argmax(q)
 		
 	def add_to_memory(self, state, action, reward, next_state, done):
 		self.replay_memory.append((state, action, reward, next_state, done))
@@ -90,10 +94,22 @@ class DQNAgent():
 		next_state_batch = tf.squeeze(tf.stack(next_state_batch), axis=1)
 		done_batch = np.array(done_batch)
 
-		Q_values = self.model.predict(state_batch, verbose=0)
-		next_Q_values = self.model.predict(next_state_batch, verbose=0)
+		if(np.random.rand() > 0.5):
+			# update A using B
+			Q_values = self.modelA.predict(state_batch, verbose=0)
+			next_Q_values = self.modelB.predict(next_state_batch, verbose=0)
 
-		target_values = reward_batch + self.gamma * np.max(next_Q_values, axis=1) * (1 - done_batch)
-		Q_values[np.arange(len(batch)), action_batch] = target_values
+			target_values = reward_batch + self.gamma * np.max(next_Q_values, axis=1) * (1 - done_batch)
+			Q_values[np.arange(len(batch)), action_batch] = target_values
 
-		self.model.fit(state_batch, Q_values, epochs=1, verbose=0)
+			self.modelA.fit(state_batch, Q_values, epochs=1, verbose=0)
+
+		else:
+			# update B using A
+			Q_values = self.modelB.predict(state_batch, verbose=0)
+			next_Q_values = self.modelA.predict(next_state_batch, verbose=0)
+
+			target_values = reward_batch + self.gamma * np.max(next_Q_values, axis=1) * (1 - done_batch)
+			Q_values[np.arange(len(batch)), action_batch] = target_values
+
+			self.modelB.fit(state_batch, Q_values, epochs=1, verbose=0)
