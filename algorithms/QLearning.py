@@ -1,7 +1,7 @@
 import numpy as np
 
 class QAgent():
-	def __init__(self, n_states, n_actions, epsilon = 1.0, epsilon_min = 0.01, epsilon_decay = 0.5, gamma = 0.95, lr = 0.8):
+	def __init__(self, n_states, n_actions, epsilon = 1.0, epsilon_min = 0.01, epsilon_decay = 0.5, gamma = 0.95, lr = 0.8, n_episodes = 10000):
 		self.n_states = n_states
 		self.n_actions = n_actions
 		self.epsilon = epsilon
@@ -9,6 +9,8 @@ class QAgent():
 		self.epsilon_decay = epsilon_decay
 		self.gamma = gamma
 		self.lr = lr
+		self.n_episodes = n_episodes
+		self.ep_count = 0.0
 
 		np.random.seed(0);
 
@@ -28,7 +30,24 @@ class QAgent():
 			else:
 				action = np.random.choice([x for x in range(self.n_states) if x not in visited_states])	# random action
 
+		self.ep_count += 1
 		# epsilon decay
+		if self.epsilon > self.epsilon_min:
+			if(self.ep_count % 3 == 0):
+				self.epsilon *= self.epsilon_decay
+
+		# if self.epsilon > self.epsilon_min:
+		# 	self.epsilon *= self.epsilon_decay
+
+		return action
+	
+	def epsilon_greedy_v2(self, state, visited_states):
+
+		if np.random.rand() > self.epsilon:
+			action = np.argmax(self.Q[state, :])
+		else:
+			action = np.random.randint(0, self.n_states)
+
 		if self.epsilon > self.epsilon_min:
 			self.epsilon *= self.epsilon_decay
 

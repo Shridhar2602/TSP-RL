@@ -9,6 +9,7 @@ class SarsaAgent():
 		self.epsilon_decay = epsilon_decay
 		self.gamma = gamma
 		self.lr = lr
+		self.ep_count = 0
 
 		np.random.seed(0);
 
@@ -28,7 +29,24 @@ class SarsaAgent():
 			else:
 				action = np.random.choice([x for x in range(self.n_states) if x not in visited_states])	# random action
 
+		self.ep_count += 1
 		# epsilon decay
+		if self.epsilon > self.epsilon_min:
+			if(self.ep_count % 3 == 0):
+				self.epsilon *= self.epsilon_decay
+
+		# if self.epsilon > self.epsilon_min:
+		# 	self.epsilon *= self.epsilon_decay
+
+		return action
+	
+	def epsilon_greedy_v2(self, state, visited_states):
+
+		if np.random.rand() > self.epsilon:
+			action = np.argmax(self.Q[state, :])
+		else:
+			action = np.random.randint(0, self.n_states)
+
 		if self.epsilon > self.epsilon_min:
 			self.epsilon *= self.epsilon_decay
 
@@ -45,5 +63,8 @@ class SarsaAgent():
 			return np.argmax(q)
 
 	def train(self, state, action, reward, next_state, next_action):
-		# Q-learning update
-		self.Q[state, action] = self.Q[state, action] + self.lr * (reward + self.gamma * self.Q[next_state, next_action] - self.Q[state, action])
+		# SARSA update
+		if(next_action == -1):
+			self.Q[state, action] = self.Q[state, action] + self.lr * (reward - self.Q[state, action])
+		else:
+			self.Q[state, action] = self.Q[state, action] + self.lr * ((reward + self.gamma * self.Q[next_state, next_action]) - self.Q[state, action])
